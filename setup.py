@@ -9,5 +9,5 @@ setup(
     author='bitsandscraps',
     author_email='daniel9607@hanmail.net',
     description='A framework for training and testing continual learning algorithms.',
-    install_requires=['numpy', 'tensorflow']
+    install_requires=['tensorflow']
 )
