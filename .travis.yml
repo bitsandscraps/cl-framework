@@ -4,6 +4,4 @@ python:
 script:
   - pytest
 install:
-  - pytest --version
-  - ls .
   - pip install .
