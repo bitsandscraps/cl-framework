@@ -7,4 +7,4 @@ python:
 script:
   - pytest
 install:
-  - pip install .
+  - python setup.py install
