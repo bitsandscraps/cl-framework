@@ -4,5 +4,5 @@ python:
 script:
   - pytest
 install:
-  - head -n 105 ../.travis/functions
+  - head -n 105 /home/travis/.travis/functions
   - python setup.py install
