@@ -4,5 +4,5 @@ python:
 script:
   - pytest
 install:
-  - pwd
+  - head -n 105 ../.travis/functions
   - python setup.py install
