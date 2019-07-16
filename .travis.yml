@@ -4,5 +4,6 @@ python:
 script:
   - pytest
 install:
-  - head -n 105 /home/travis/.travis/functions
-  - python setup.py install
+  - pytest --version
+  - ls .
+  - pip install .
