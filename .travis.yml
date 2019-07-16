@@ -4,4 +4,5 @@ python:
 script:
   - pytest
 install:
+  - pwd
   - python setup.py install
