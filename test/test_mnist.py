@@ -12,6 +12,7 @@ def test_preprocess():
 def test_permuted_mnist():
     x_train_first = y_train_first = x_test_first = y_test_first = None
     pm = PermutedMnist(10)
+    assert pm.labels_per_task == [tuple(range(10))] * 10
     for idx, (training_set, test_set) in enumerate(zip(pm.training_sets, pm.test_sets)):
         x_train = training_set.features
         x_test = test_set.features
@@ -65,7 +66,8 @@ def test_split_mnist():
     total_test = test.shape[0]
     ntrain = ntest = 0
     sm = SplitMnist(2)
-    for idx, (training_set, test_set) in enumerate(zip(sm.training_sets, sm.test_sets)):
+    assert sm.labels_per_task == [(i, i + 1) for i in range(0, 10, 2)]
+    for labels, training_set, test_set in zip(sm.labels_per_task, sm.training_sets, sm.test_sets):
         x_train = training_set.features
         x_test = test_set.features
         y_train = training_set.labels
@@ -79,9 +81,10 @@ def test_split_mnist():
         ntrain += y_train.shape[0]
         ntest += y_test.shape[0]
         for y in y_train:
-            assert y in (idx, idx + 1)
+            assert y in labels
         for y in y_test:
-            assert y in (idx, idx + 1)
-    assert idx == 9
+            assert y in labels
+    assert len(sm.training_sets) == 5
+    assert len(sm.test_sets) == 5
     assert ntrain == total_train
     assert ntest == total_test

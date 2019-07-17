@@ -3,7 +3,7 @@ from itertools import zip_longest
 import numpy as np
 from tensorflow.keras.datasets import mnist
 
-from clfw.clfw import Array, DataSet, Task, TaskSequence
+from clfw.core import Array, DataSet, Task, TaskSequence
 
 
 def preprocess() -> Task:
@@ -69,7 +69,7 @@ class SplitMnist(TaskSequence):
         super().__init__(nlabels=10)
         original_task = preprocess()
 
-        args = [range(10)] * nlabels_per_task
+        args = [iter(range(10))] * nlabels_per_task
         labels_of_interest_for_each_task = zip_longest(*args)
 
         for labels_of_interest in labels_of_interest_for_each_task:

@@ -1,7 +1,7 @@
 from typing import Optional
 import numpy as np
 
-from clfw.clfw import Array, DataSet, Model, Task, TaskSequence
+from clfw import Array, DataSet, Model, Task, TaskSequence
 
 
 class ToyModel(Model):

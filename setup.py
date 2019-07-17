@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='clfw',
-    version='0.1',
+    version='0.2',
     packages=['clfw'],
     url='https://github.com/bitsandscraps/continual-learning-framework',
     license='MIT',
