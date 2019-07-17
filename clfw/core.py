@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from typing import Iterable, List, NamedTuple, Optional, Tuple
 
 import numpy as np
@@ -16,13 +17,15 @@ class Task(NamedTuple):
     labels: Iterable[int]
 
 
-class Model:
+class Model(ABC):
     """ Base class for a model for continual learning """
+    @abstractmethod
     def train(self, training_set: DataSet, labels: Iterable[int]) -> None:
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def classify(self, features: Array) -> Array:
-        raise NotImplementedError()
+        pass
 
     def evaluate(self, test_set: DataSet) -> Tuple[int, int]:
         """ Evaluate the model using the given test set.
