@@ -9,14 +9,16 @@ class DataSet(NamedTuple):
     features: Array
     labels: Array
 
+
 class Task(NamedTuple):
     training_set: DataSet
     test_set: DataSet
+    labels: Iterable[int]
 
 
 class Model:
     """ Base class for a model for continual learning """
-    def train(self, training_set: DataSet) -> None:
+    def train(self, training_set: DataSet, labels: Iterable[int]) -> None:
         raise NotImplementedError()
 
     def classify(self, features: Array) -> Array:
@@ -53,19 +55,16 @@ class TaskSequence:
         test_sets: list of test sets
     """
     def __init__(self, nlabels: int, tasks: Optional[Iterable[Task]] = None) -> None:
-        self.labels_per_task: List[Tuple[int, ...]]
+        self.labels_per_task: List[Iterable[int]] = []
         self.nlabels = nlabels
         self.ntasks: int = len(tasks) if tasks is not None else 0
-        self.training_sets: List[DataSet]
-        self.test_sets: List[DataSet]
-        if tasks is None:
-            self.training_sets = []
-            self.test_sets = []
-            self.labels_per_task = []
-        else:
-            self.training_sets = [task.training_set for task in tasks]
-            self.test_sets = [task.test_set for task in tasks]
-            self.labels_per_task = [self.inspect_labels(task.training_set) for task in tasks]
+        self.training_sets: List[DataSet] = []
+        self.test_sets: List[DataSet] = []
+        if tasks:
+            for task in tasks:
+                self.training_sets.append(task.training_set)
+                self.test_sets.append(task.test_set)
+                self.labels_per_task.append(task.labels)
 
     @property
     def feature_dim(self) -> Tuple[int, ...]:
@@ -79,7 +78,7 @@ class TaskSequence:
         self.ntasks += 1
         self.training_sets.append(task.training_set)
         self.test_sets.append(task.test_set)
-        self.labels_per_task.append(self.inspect_labels(task.training_set))
+        self.labels_per_task.append(task.labels)
 
     def evaluate(self, model: Model) -> Tuple[Array]:
         """ Evaluate the model using the given sequence of tasks.
@@ -114,7 +113,3 @@ class TaskSequence:
                 ntotal += ntotal_task
             average_accuracy[train_idx + 1] = ncorrect / ntotal
         return average_accuracy, accuracy_matrix
-
-    @staticmethod
-    def inspect_labels(dataset: DataSet) -> Tuple[int, ...]:
-        return tuple(np.unique(dataset.labels.ravel()).tolist())

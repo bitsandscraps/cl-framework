@@ -33,12 +33,14 @@ class ToyModel(Model):
 TOY_TASK_1 = Task(training_set=DataSet(features=np.arange(8).reshape(4, 2),
                                        labels=np.arange(4)),
                   test_set=DataSet(features=np.asarray([[0, 1], [2, 3], [5, 6], [7, 8]]),
-                                   labels=np.asarray([0, 1, 5, 0])))
+                                   labels=np.asarray([0, 1, 5, 0])),
+                  labels=range(6))
 
 TOY_TASK_2 = Task(training_set=DataSet(features=np.arange(8).reshape(4, 2) + 1,
                                        labels=np.arange(4) + 1),
                   test_set=DataSet(features=TOY_TASK_1.test_set.features + 1,
-                                   labels=TOY_TASK_1.test_set.labels + 1))
+                                   labels=TOY_TASK_1.test_set.labels + 1),
+                  labels=range(7))
 
 
 def test_evaluate_model():

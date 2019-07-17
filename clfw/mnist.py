@@ -1,4 +1,5 @@
 from itertools import zip_longest
+from typing import Tuple
 
 import numpy as np
 from tensorflow.keras.datasets import mnist
@@ -6,7 +7,7 @@ from tensorflow.keras.datasets import mnist
 from clfw.core import Array, DataSet, Task, TaskSequence
 
 
-def preprocess() -> Task:
+def preprocess() -> Tuple[DataSet, DataSet]:
     """ Preprocess the MNIST dataset.
 
     Loads the MNIST dataset and converts each image into a 1D-array.
@@ -27,8 +28,7 @@ def preprocess() -> Task:
 
     x_train = flatten_each_image(x_train)
     x_test = flatten_each_image(x_test)
-    return Task(training_set=DataSet(features=x_train, labels=y_train),
-                test_set=DataSet(features=x_test, labels=y_test))
+    return DataSet(features=x_train, labels=y_train), DataSet(features=x_test, labels=y_test)
 
 
 class PermutedMnist(TaskSequence):
@@ -40,18 +40,18 @@ class PermutedMnist(TaskSequence):
     def __init__(self, ntasks: int = 5) -> None:
         """ Inits a PermutedMnist class with `ntasks` tasks """
         super().__init__(nlabels=10)
-        original_task = preprocess()
+        original_training_set, original_test_set = preprocess()
 
-        image_size = original_task.training_set.features.shape[-1]
+        image_size = original_training_set.features.shape[-1]
 
         for _ in range(ntasks):
             pattern: np.ndarray = np.random.permutation(image_size)
             # advanced indexing returns a copy
-            training_set = DataSet(features=original_task.training_set.features[..., pattern],
-                                   labels=original_task.training_set.labels.copy())
-            test_set = DataSet(features=original_task.test_set.features[..., pattern],
-                               labels=original_task.test_set.labels.copy())
-            self.append(Task(training_set=training_set, test_set=test_set))
+            training_set = DataSet(features=original_training_set.features[..., pattern],
+                                   labels=original_training_set.labels.copy())
+            test_set = DataSet(features=original_test_set.features[..., pattern],
+                               labels=original_test_set.labels.copy())
+            self.append(Task(training_set=training_set, test_set=test_set, labels=range(10)))
 
 
 class SplitMnist(TaskSequence):
@@ -67,15 +67,17 @@ class SplitMnist(TaskSequence):
             nlabels_per_task: number of labels assigned to each task.
         """
         super().__init__(nlabels=10)
-        original_task = preprocess()
+        original_training_set, original_test_set = preprocess()
 
         args = [iter(range(10))] * nlabels_per_task
         labels_of_interest_for_each_task = zip_longest(*args)
 
         for labels_of_interest in labels_of_interest_for_each_task:
-            training_set = self.extract_label(original_task.training_set, labels_of_interest)
-            test_set = self.extract_label(original_task.test_set, labels_of_interest)
-            self.append(Task(training_set=training_set, test_set=test_set))
+            training_set = self.extract_label(original_training_set, labels_of_interest)
+            test_set = self.extract_label(original_test_set, labels_of_interest)
+            self.append(Task(training_set=training_set,
+                             test_set=test_set,
+                             labels=labels_of_interest))
 
     @staticmethod
     def extract_label(data_set: DataSet, labels_of_interest) -> DataSet:
