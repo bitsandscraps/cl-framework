@@ -26,8 +26,8 @@ def preprocess() -> Tuple[DataSet, DataSet]:
     def flatten_each_image(images: Array) -> Array:
         return images.reshape(images.shape[0], -1)
 
-    x_train = flatten_each_image(x_train)
-    x_test = flatten_each_image(x_test)
+    x_train = flatten_each_image(x_train) / 256
+    x_test = flatten_each_image(x_test) / 256
     return DataSet(features=x_train, labels=y_train), DataSet(features=x_test, labels=y_test)
 
 

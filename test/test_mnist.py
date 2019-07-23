@@ -19,6 +19,7 @@ def test_permuted_mnist():
         y_train = training_set.labels
         y_test = test_set.labels
         assert x_train.ndim == 2
+        assert np.max(x_train) == 255/256
         assert x_test.ndim == 2
         assert y_train.ndim == 1
         assert y_test.ndim == 1
@@ -73,6 +74,7 @@ def test_split_mnist():
         y_train = training_set.labels
         y_test = test_set.labels
         assert x_train.ndim == 2
+        assert np.max(x_train) == 255/256
         assert x_test.ndim == 2
         assert y_train.ndim == 1
         assert y_test.ndim == 1
