@@ -21,8 +21,8 @@ def preprocess() -> Tuple[Dataset, Dataset, int]:
     """
     dataset_info: DatasetInfo
     (train, test), dataset_info = tfds.load(
-        'mnist', as_supervised=True, with_info=True, split=['train', 'test'],
-        as_dataset_kwargs={'shuffle_files': False})
+        'mnist:1.*.*', as_supervised=True, with_info=True,
+        split=['train', 'test'], as_dataset_kwargs={'shuffle_files': False})
     image: tfds.features.Image = dataset_info.features['image']
     image_size = reduce(operator.mul, image.shape)
 
