@@ -2,32 +2,25 @@ from abc import ABC, abstractmethod
 from typing import Iterable, List, NamedTuple, Optional, Tuple
 
 import numpy as np
+from tensorflow.data import Dataset
 
 Array = np.ndarray
 
 
-class DataSet(NamedTuple):
-    features: Array
-    labels: Array
-
-
 class Task(NamedTuple):
-    training_set: DataSet
-    test_set: DataSet
+    train: Dataset
+    test: Dataset
     labels: Iterable[int]
 
 
 class Model(ABC):
     """ Base class for a model for continual learning """
     @abstractmethod
-    def train(self, training_set: DataSet, labels: Iterable[int]) -> None:
+    def train(self, training_set: Dataset, labels: Iterable[int]) -> None:
         pass
 
     @abstractmethod
-    def classify(self, features: Array) -> Array:
-        pass
-
-    def evaluate(self, test_set: DataSet) -> Tuple[int, int]:
+    def evaluate(self, test_set: Dataset) -> Tuple[int, int]:
         """ Evaluate the model using the given test set.
 
         Returns:
@@ -39,11 +32,7 @@ class Model(ABC):
             This means the test set has 1000 examples and the model has achieved 94.8%
             accuracy on it.
         """
-        prediction: Array = self.classify(test_set.features).ravel()
-        labels: Array = test_set.labels.ravel()
-        ncorrect = np.count_nonzero(labels == prediction)
-        ntotal = labels.size
-        return ncorrect, ntotal
+        pass
 
 
 class TaskSequence:
@@ -60,30 +49,31 @@ class TaskSequence:
     def __init__(self, nlabels: int, tasks: Optional[Iterable[Task]] = None) -> None:
         self.labels_per_task: List[Iterable[int]] = []
         self.nlabels = nlabels
-        self.ntasks: int = len(tasks) if tasks is not None else 0
-        self.training_sets: List[DataSet] = []
-        self.test_sets: List[DataSet] = []
-        if tasks:
+        self.training_sets: List[Dataset] = []
+        self.test_sets: List[Dataset] = []
+        self.ntasks = 0
+        if tasks is not None:
             for task in tasks:
-                self.training_sets.append(task.training_set)
-                self.test_sets.append(task.test_set)
+                self.ntasks += 1
+                self.training_sets.append(task.train)
+                self.test_sets.append(task.test)
                 self.labels_per_task.append(task.labels)
 
     @property
-    def feature_dim(self) -> Tuple[int, ...]:
+    def feature_dim(self) -> List[int]:
         if not self.training_sets:
             raise ValueError("There are no tasks yet.")
-        # 0-th element is the number of training examples
-        return self.training_sets[0].features.shape[1:]
+        sample, _ = next(iter(self.training_sets[0]))
+        return [s.value for s in sample.shape]
 
     def append(self, task: Task) -> None:
         """ Append a training set test set pair to the sequence. """
         self.ntasks += 1
-        self.training_sets.append(task.training_set)
-        self.test_sets.append(task.test_set)
+        self.training_sets.append(task.train)
+        self.test_sets.append(task.test)
         self.labels_per_task.append(task.labels)
 
-    def evaluate(self, model: Model) -> Tuple[Array]:
+    def evaluate(self, model: Model) -> Tuple[Array, Array]:
         """ Evaluate the model using the given sequence of tasks.
 
         Returns:
@@ -106,8 +96,9 @@ class TaskSequence:
             ncorrect += ncorrect_task
             ntotal += ntotal_task
         average_accuracy[0] = ncorrect / ntotal
-        for train_idx, training_set in enumerate(self.training_sets):
-            model.train(training_set)
+        for train_idx, (training_set, labels) in enumerate(
+                zip(self.training_sets, self.labels_per_task)):
+            model.train(training_set, labels)
             ncorrect = ntotal = 0
             for test_idx, test_set in enumerate(self.test_sets):
                 ncorrect_task, ntotal_task = model.evaluate(test_set)

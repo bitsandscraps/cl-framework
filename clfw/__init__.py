@@ -1,1 +1,1 @@
-from clfw.core import Array, DataSet, Model, Task, TaskSequence
+from clfw.core import Array, Model, Task, TaskSequence

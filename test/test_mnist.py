@@ -1,28 +1,36 @@
+from itertools import zip_longest
+from typing import Tuple
+
 import numpy as np
+import tensorflow as tf
+import tensorflow_datasets as tfds
 
 from clfw.mnist import preprocess, PermutedMnist, SplitMnist
 
 
 def test_preprocess():
-    (x_train, y_train), (x_test, y_test) = preprocess()
-    assert x_train.ndim == 2 and x_train.shape[-1] == 784
-    assert x_test.ndim == 2 and x_test.shape[-1] == 784
+    train, test, image_size = preprocess()
+    assert image_size == 784
+
+    def sample(ds) -> Tuple[tf.Tensor, tf.Tensor]:
+        return next(iter(ds.cache().batch(1)))
+
+    assert sample(train)[0].shape[1] == 784
+    assert sample(test)[0].shape[1] == 784
 
 
 def test_permuted_mnist():
     x_train_first = y_train_first = x_test_first = y_test_first = None
     pm = PermutedMnist(10)
     assert cmp_labels_per_task(pm.labels_per_task, [range(10)] * 10)
-    for idx, (training_set, test_set) in enumerate(zip(pm.training_sets, pm.test_sets)):
-        x_train = training_set.features
-        x_test = test_set.features
-        y_train = training_set.labels
-        y_test = test_set.labels
+    for idx, (trains, tests) in enumerate(zip(pm.training_sets, pm.test_sets)):
+        trains = tfds.as_numpy(trains.batch(60000))
+        tests = tfds.as_numpy(tests.batch(10000))
+        x_train, y_train = next(trains)
+        x_test, y_test = next(tests)
         assert x_train.ndim == 2
-        assert np.max(x_train) == 255/256
-        assert x_test.ndim == 2
         assert y_train.ndim == 1
-        assert y_test.ndim == 1
+        assert np.max(x_train) == 255/256
         assert x_train.shape[0] == y_train.shape[0]
         assert x_test.shape[0] == y_test.shape[0]
         if x_train_first is None:
@@ -31,48 +39,23 @@ def test_permuted_mnist():
             x_test_first = x_test
             y_test_first = y_test
         else:
-            # Check if the features are actually permuted
-            x_train_check = x_train_first == x_train
-            y_train_check = y_train_first == y_train
-            x_test_check = x_test_first == x_test
-            y_test_check = y_test_first == y_test
-            assert not np.any(np.all(x_train_check, axis=1))
-            assert not np.any(np.all(x_test_check, axis=1))
-            assert np.all(y_train_check)
-            assert np.all(y_test_check)
-
-            # Check if everything is deep copied
-            x_train_orig = x_train.copy()
-            y_train_orig = y_train.copy()
-            x_test_orig = x_test.copy()
-            y_test_orig = y_test.copy()
-            x_train_first += 1
-            y_train_first += 1
-            x_test_first += 1
-            y_test_first += 1
-            assert np.all(x_train_orig == x_train)
-            assert np.all(y_train_orig == y_train)
-            assert np.all(x_test_orig == x_test)
-            assert np.all(y_test_orig == y_test)
-            x_train_first -= 1
-            y_train_first -= 1
-            x_test_first -= 1
-            y_test_first -= 1
+            assert not np.allclose(x_train, x_train_first)
+            assert not np.allclose(x_test, x_test_first)
+            assert np.all(y_train_first == y_train)
+            assert np.all(y_test_first == y_test)
     assert idx == 9
 
 
 def test_split_mnist():
-    (_, train), (_, test) = preprocess()
-    total_train = train.shape[0]
-    total_test = test.shape[0]
-    ntrain = ntest = 0
     sm = SplitMnist(2)
     assert cmp_labels_per_task(sm.labels_per_task, [(i, i + 1) for i in range(0, 10, 2)])
-    for labels, training_set, test_set in zip(sm.labels_per_task, sm.training_sets, sm.test_sets):
-        x_train = training_set.features
-        x_test = test_set.features
-        y_train = training_set.labels
-        y_test = test_set.labels
+    ntrain = 0
+    ntest = 0
+    for labels, trains, tests in zip(sm.labels_per_task, sm.training_sets, sm.test_sets):
+        trains = tfds.as_numpy(trains.batch(60000))
+        tests = tfds.as_numpy(tests.batch(10000))
+        x_train, y_train = next(trains)
+        x_test, y_test = next(tests)
         assert x_train.ndim == 2
         assert np.max(x_train) == 255/256
         assert x_test.ndim == 2
@@ -88,17 +71,18 @@ def test_split_mnist():
             assert y in labels
     assert len(sm.training_sets) == 5
     assert len(sm.test_sets) == 5
-    assert ntrain == total_train
-    assert ntest == total_test
+    assert ntrain == 60000
+    assert ntest == 10000
 
 
 def cmp_labels_per_task(list1, list2):
     if len(list1) != len(list2):
         return False
     for x, y in zip(list1, list2):
-        if len(x) != len(y):
+        if tuple(x) != tuple(y):
             return False
-        for z, w in zip(x, y):
-            if z != w:
-                return False
     return True
+
+
+if __name__ == '__main__':
+    test_permuted_mnist()
