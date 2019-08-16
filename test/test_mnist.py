@@ -1,87 +1,111 @@
 from itertools import zip_longest
-from typing import Tuple
+from typing import Tuple, Sequence
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.data import Dataset
 import tensorflow_datasets as tfds
 
+from clfw import TaskSequence
 from clfw.mnist import preprocess, PermutedMnist, SplitMnist
 
+_Dataset = Tuple[np.ndarray, np.ndarray]
 
-def test_preprocess():
-    train, test, image_size = preprocess()
+
+def sample_all(
+    train: Dataset, valid: Dataset, test: Dataset
+) -> Tuple[_Dataset, _Dataset, _Dataset]:
+    train_ = tfds.as_numpy(train.batch(50000))
+    valid_ = tfds.as_numpy(valid.batch(10000))
+    test_ = tfds.as_numpy(test.batch(10000))
+    return next(train_), next(valid_), next(test_)
+
+
+def check_labels_per_task(list1, list2):
+    assert len(list1) == len(list2)
+    for x, y in zip(list1, list2):
+        assert tuple(x) == tuple(y)
+
+
+def check(dataset: _Dataset, labels: Sequence[int]) -> int:
+    """ Test a dataset.
+
+    :param dataset: dataset under inspection
+    :param labels: labels of interest
+    :return: number of samples in the dataset
+    """
+    x, y = dataset
+    assert x.ndim == 2
+    assert np.max(x) == 255 / 256
+    assert y.ndim == 1
+    assert x.shape[0] == y.shape[0]
+    counts = np.histogram(y, range(11))[0]
+    for idx in range(10):
+        if idx in labels:
+            assert counts[idx] > 0
+        else:
+            assert counts[idx] == 0
+    return y.shape[0]
+
+
+def check_length(model: TaskSequence, length: int) -> None:
+    assert len(model.training_sets) == length
+    assert len(model.validation_sets) == length
+    assert len(model.test_sets) == length
+
+
+def test_preprocess() -> None:
+    datasets, image_size = preprocess()
     assert image_size == 784
 
     def sample(ds) -> Tuple[tf.Tensor, tf.Tensor]:
         return next(iter(ds.cache().batch(1)))
 
-    assert sample(train)[0].shape[1] == 784
-    assert sample(test)[0].shape[1] == 784
+    for ds in datasets:
+        assert sample(ds)[0].shape[1] == 784
 
 
-def test_permuted_mnist():
-    x_train_first = y_train_first = x_test_first = y_test_first = None
+def test_permuted_mnist() -> None:
+    train_first = valid_first = test_first = None
     pm = PermutedMnist(10)
-    assert cmp_labels_per_task(pm.labels_per_task, [range(10)] * 10)
-    for idx, (trains, tests) in enumerate(zip(pm.training_sets, pm.test_sets)):
-        trains = tfds.as_numpy(trains.batch(60000))
-        tests = tfds.as_numpy(tests.batch(10000))
-        x_train, y_train = next(trains)
-        x_test, y_test = next(tests)
-        assert x_train.ndim == 2
-        assert y_train.ndim == 1
-        assert np.max(x_train) == 255/256
-        assert x_train.shape[0] == y_train.shape[0]
-        assert x_test.shape[0] == y_test.shape[0]
-        if x_train_first is None:
-            x_train_first = x_train
-            y_train_first = y_train
-            x_test_first = x_test
-            y_test_first = y_test
+    check_labels_per_task(pm.labels_per_task, [range(10)] * 10)
+    for label, train, valid, test in zip(pm.labels_per_task, pm.training_sets,
+                                         pm.validation_sets, pm.test_sets):
+        train, valid, test = sample_all(train, valid, test)
+        label = tuple(label)
+        check(train, label)
+        check(valid, label)
+        check(test, label)
+
+        if train_first is None:
+            train_first, valid_first, test_first = train, valid, test
         else:
-            assert not np.allclose(x_train, x_train_first)
-            assert not np.allclose(x_test, x_test_first)
-            assert np.all(y_train_first == y_train)
-            assert np.all(y_test_first == y_test)
-    assert idx == 9
+            assert not np.allclose(train[0], train_first[0])
+            assert not np.allclose(valid[0], valid_first[0])
+            assert not np.allclose(test[0], test_first[0])
+            assert np.all(train_first[1] == train[1])
+            assert np.all(valid_first[1] == valid[1])
+            assert np.all(test_first[1] == test[1])
+    check_length(pm, 10)
 
 
 def test_split_mnist():
     sm = SplitMnist(2)
-    assert cmp_labels_per_task(sm.labels_per_task, [(i, i + 1) for i in range(0, 10, 2)])
-    ntrain = 0
-    ntest = 0
-    for labels, trains, tests in zip(sm.labels_per_task, sm.training_sets, sm.test_sets):
-        trains = tfds.as_numpy(trains.batch(60000))
-        tests = tfds.as_numpy(tests.batch(10000))
-        x_train, y_train = next(trains)
-        x_test, y_test = next(tests)
-        assert x_train.ndim == 2
-        assert np.max(x_train) == 255/256
-        assert x_test.ndim == 2
-        assert y_train.ndim == 1
-        assert y_test.ndim == 1
-        assert x_train.shape[0] == y_train.shape[0]
-        assert x_test.shape[0] == y_test.shape[0]
-        ntrain += y_train.shape[0]
-        ntest += y_test.shape[0]
-        for y in y_train:
-            assert y in labels
-        for y in y_test:
-            assert y in labels
-    assert len(sm.training_sets) == 5
-    assert len(sm.test_sets) == 5
-    assert ntrain == 60000
+    check_labels_per_task(sm.labels_per_task,
+                          [(i, i + 1) for i in range(0, 10, 2)])
+    ntrain = nvalid = ntest = 0
+    for label, train, valid, test in zip(
+            sm.labels_per_task, sm.training_sets, sm.validation_sets, sm.test_sets):
+        train, valid, test = sample_all(train, valid, test)
+        label = tuple(label)
+        ntrain += check(train, label)
+        nvalid += check(valid, label)
+        ntest += check(test, label)
+
+    check_length(sm, 5)
+    assert ntrain == 50000
+    assert nvalid == 10000
     assert ntest == 10000
-
-
-def cmp_labels_per_task(list1, list2):
-    if len(list1) != len(list2):
-        return False
-    for x, y in zip(list1, list2):
-        if tuple(x) != tuple(y):
-            return False
-    return True
 
 
 if __name__ == '__main__':

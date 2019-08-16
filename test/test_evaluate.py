@@ -19,7 +19,11 @@ class ToyModel(Model):
         self.memory_features: Optional[Array] = None
         self.memory_labels: Optional[Array] = None
 
-    def train(self, training_set: Dataset, labels: Iterable[int]) -> None:
+    def train(self,
+              training_set: Dataset,
+              validation_set: Dataset,
+              labels: Iterable[int]) -> None:
+        del validation_set
         del labels
 
         features, labels = next(tfds.as_numpy(training_set.batch(1000)))
@@ -32,7 +36,7 @@ class ToyModel(Model):
 
     def evaluate(self, test_set: Dataset) -> Tuple[int, int]:
         features, labels = next(tfds.as_numpy(test_set.batch(1000)))
-        ntotal = labels.shape[0]
+        ntotal: int = labels.shape[0]
         if self.memory_features is None:
             return np.sum(labels == 0), ntotal
         prediction = np.empty(features.shape[0])
@@ -47,12 +51,14 @@ class ToyModel(Model):
 
 def toy_task_1():
     return Task(train=Dataset.from_tensor_slices(TOY_TASK_1_TRAIN),
+                valid=None,
                 test=Dataset.from_tensor_slices(TOY_TASK_1_TEST),
                 labels=range(7))
 
 
 def toy_task_2():
     return Task(train=Dataset.from_tensor_slices(TOY_TASK_2_TRAIN),
+                valid=None,
                 test=Dataset.from_tensor_slices(TOY_TASK_2_TEST),
                 labels=range(7))
 
@@ -62,11 +68,11 @@ def test_evaluate_model():
     t1 = toy_task_1()
     t2 = toy_task_2()
     assert model.evaluate(t1.test) == (2, 4)
-    model.train(t1.train, t1.labels)
+    model.train(t1.train, t1.valid, t1.labels)
     assert model.evaluate(t1.test) == (3, 4)
     model = ToyModel()
     assert model.evaluate(t2.test) == (0, 4)
-    model.train(t2.train, t2.labels)
+    model.train(t2.train, t2.valid, t2.labels)
     assert model.evaluate(t2.test) == (2, 4)
 
 

@@ -9,6 +9,7 @@ Array = np.ndarray
 
 class Task(NamedTuple):
     train: Dataset
+    valid: Dataset
     test: Dataset
     labels: Iterable[int]
 
@@ -16,7 +17,10 @@ class Task(NamedTuple):
 class Model(ABC):
     """ Base class for a model for continual learning """
     @abstractmethod
-    def train(self, training_set: Dataset, labels: Iterable[int]) -> None:
+    def train(self,
+              training_set: Dataset,
+              validation_set: Dataset,
+              labels: Iterable[int]) -> None:
         pass
 
     @abstractmethod
@@ -50,12 +54,14 @@ class TaskSequence:
         self.labels_per_task: List[Iterable[int]] = []
         self.nlabels = nlabels
         self.training_sets: List[Dataset] = []
+        self.validation_sets: List[Dataset] = []
         self.test_sets: List[Dataset] = []
         self.ntasks = 0
         if tasks is not None:
             for task in tasks:
                 self.ntasks += 1
                 self.training_sets.append(task.train)
+                self.validation_sets.append(task.valid)
                 self.test_sets.append(task.test)
                 self.labels_per_task.append(task.labels)
 
@@ -70,6 +76,7 @@ class TaskSequence:
         """ Append a training set test set pair to the sequence. """
         self.ntasks += 1
         self.training_sets.append(task.train)
+        self.validation_sets.append(task.valid)
         self.test_sets.append(task.test)
         self.labels_per_task.append(task.labels)
 
@@ -96,9 +103,10 @@ class TaskSequence:
             ncorrect += ncorrect_task
             ntotal += ntotal_task
         average_accuracy[0] = ncorrect / ntotal
-        for train_idx, (training_set, labels) in enumerate(
-                zip(self.training_sets, self.labels_per_task)):
-            model.train(training_set, labels)
+        for train_idx, (training_set, validation_set, labels) in enumerate(
+                zip(self.training_sets,
+                    self.validation_sets, self.labels_per_task)):
+            model.train(training_set, validation_set, labels)
             ncorrect = ntotal = 0
             for test_idx, test_set in enumerate(self.test_sets):
                 ncorrect_task, ntotal_task = model.evaluate(test_set)
