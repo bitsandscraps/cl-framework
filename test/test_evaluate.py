@@ -1,3 +1,5 @@
+import os.path
+from tempfile import TemporaryDirectory
 from typing import Iterable, Optional, Tuple
 
 import numpy as np
@@ -84,6 +86,14 @@ def test_task_sequence():
     acc, accmat = task_seq.evaluate(ToyModel())
     assert np.all(acc == np.asarray([0.25, 0.375, 0.5]))
     assert np.all(accmat == np.asarray([[0.5, 0], [0.75, 0], [0.5, 0.5]]))
+    with TemporaryDirectory() as dir:
+        acc, accmat = task_seq.evaluate(ToyModel(), logdir=dir)
+        assert np.all(acc == np.asarray([0.25, 0.375, 0.5]))
+        assert np.all(accmat == np.asarray([[0.5, 0], [0.75, 0], [0.5, 0.5]]))
+        result = np.load(os.path.join(dir, 'test_acc.npz'))
+        acc, accmat = result['average_accuracy'], result['accuracy_matrix']
+        assert np.all(acc == np.asarray([0.25, 0.375, 0.5]))
+        assert np.all(accmat == np.asarray([[0.5, 0], [0.75, 0], [0.5, 0.5]]))
 
 
 def check_one_hot(dataset: Optional[Dataset], nlabels: int):
@@ -98,10 +108,6 @@ def test_onehot():
     assert task_seq.ntasks == 2
     assert task_seq.nlabels == 10
     assert task_seq.feature_dim == [2]
-    for train, valid, test in zip(task_seq.training_sets,
-                                  task_seq.validation_sets,
-                                  task_seq.test_sets):
+    for train in task_seq.training_sets:
         check_one_hot(train, 10)
-        check_one_hot(valid, 10)
-        check_one_hot(test, 10)
 

@@ -80,8 +80,8 @@ def _test_permuted_mnist(one_hot: bool) -> None:
         train, valid, test = sample_all(train, valid, test)
         label = tuple(label)
         check(train, label, one_hot)
-        check(valid, label, one_hot)
-        check(test, label, one_hot)
+        check(valid, label, False)
+        check(test, label, False)
 
         if train_first is None:
             train_first, valid_first, test_first = train, valid, test
@@ -105,8 +105,8 @@ def _test_split_mnist(one_hot: bool):
         train, valid, test = sample_all(train, valid, test)
         label = tuple(label)
         ntrain += check(train, label, one_hot)
-        nvalid += check(valid, label, one_hot)
-        ntest += check(test, label, one_hot)
+        nvalid += check(valid, label, False)
+        ntest += check(test, label, False)
 
     check_length(sm, 5)
     assert ntrain == 50000

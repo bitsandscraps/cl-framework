@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import os.path
 from typing import Iterable, List, NamedTuple, Optional, Tuple
 
 import numpy as np
@@ -21,9 +22,6 @@ def to_one_hot(task: Task, nlabels: int) -> Task:
     def one_hot(feature: tf.Tensor, label: tf.Tensor):
         return feature, tf.one_hot(label, nlabels)
     train = train.map(one_hot)
-    if valid is not None:
-        valid = valid.map(one_hot)
-    test = test.map(one_hot)
     return Task(train=train, valid=valid, test=test, labels=task.labels)
 
 
@@ -94,7 +92,8 @@ class TaskSequence:
         self.test_sets.append(task.test)
         self.labels_per_task.append(task.labels)
 
-    def evaluate(self, model: Model) -> Tuple[Array, Array]:
+    def evaluate(self, model: Model,
+                 logdir: Optional[str] = None) -> Tuple[Array, Array]:
         """ Evaluate the model using the given sequence of tasks.
 
         Returns:
@@ -128,4 +127,8 @@ class TaskSequence:
                 ncorrect += ncorrect_task
                 ntotal += ntotal_task
             average_accuracy[train_idx + 1] = ncorrect / ntotal
+            if logdir is not None:
+                np.savez(os.path.join(logdir, 'test_acc.npz'),
+                         average_accuracy=average_accuracy,
+                         accuracy_matrix=accuracy_matrix)
         return average_accuracy, accuracy_matrix
