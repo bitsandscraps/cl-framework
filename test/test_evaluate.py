@@ -38,7 +38,7 @@ class ToyModel(Model):
         features, labels = next(tfds.as_numpy(test_set.batch(1000)))
         ntotal: int = labels.shape[0]
         if self.memory_features is None:
-            return np.sum(labels == 0), ntotal
+            return int(np.sum(labels == 0)), ntotal
         prediction = np.empty(features.shape[0])
         for idx, feature in enumerate(features):
             search: Array = np.all(self.memory_features == feature, axis=1).nonzero()
@@ -46,7 +46,7 @@ class ToyModel(Model):
                 prediction[idx] = 0     # default prediction
             else:
                 prediction[idx] = self.memory_labels[search[0][0]]
-        return np.sum(prediction == labels), ntotal
+        return int(np.sum(prediction == labels)), ntotal
 
 
 def toy_task_1():
@@ -77,10 +77,31 @@ def test_evaluate_model():
 
 
 def test_task_sequence():
-    task_seq = TaskSequence(10, [toy_task_1(), toy_task_2()])
+    task_seq = TaskSequence(10, False, [toy_task_1(), toy_task_2()])
     assert task_seq.ntasks == 2
     assert task_seq.nlabels == 10
     assert task_seq.feature_dim == [2]
     acc, accmat = task_seq.evaluate(ToyModel())
     assert np.all(acc == np.asarray([0.25, 0.375, 0.5]))
     assert np.all(accmat == np.asarray([[0.5, 0], [0.75, 0], [0.5, 0.5]]))
+
+
+def check_one_hot(dataset: Optional[Dataset], nlabels: int):
+    if dataset is None:
+        return
+    _, labels = next(tfds.as_numpy(dataset.batch(1000)))
+    assert labels.shape[1] == nlabels
+
+
+def test_onehot():
+    task_seq = TaskSequence(10, True, [toy_task_1(), toy_task_2()])
+    assert task_seq.ntasks == 2
+    assert task_seq.nlabels == 10
+    assert task_seq.feature_dim == [2]
+    for train, valid, test in zip(task_seq.training_sets,
+                                  task_seq.validation_sets,
+                                  task_seq.test_sets):
+        check_one_hot(train, 10)
+        check_one_hot(valid, 10)
+        check_one_hot(test, 10)
+

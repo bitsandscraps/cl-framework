@@ -44,9 +44,9 @@ class PermutedMnist(TaskSequence):
     For each task, every image in the training and test set of MNIST database is
     permuted in a certain random order.
     """
-    def __init__(self, ntasks: int = 5) -> None:
+    def __init__(self, ntasks: int = 5, one_hot: bool = True) -> None:
         """ Inits a PermutedMnist class with `ntasks` tasks """
-        super().__init__(nlabels=10)
+        super().__init__(nlabels=10, one_hot=one_hot)
         datasets, image_size = preprocess()
 
         for _ in range(ntasks):
@@ -66,13 +66,13 @@ class SplitMnist(TaskSequence):
     Each task has its own labels of interest. The training set and test set of a task
     contains only the images with the corresponding labels.
     """
-    def __init__(self, nlabels_per_task: int = 2) -> None:
+    def __init__(self, nlabels_per_task: int = 2, one_hot: bool = True) -> None:
         """ Inits a SplitMnist class.
 
         Args:
             nlabels_per_task: number of labels assigned to each task.
         """
-        super().__init__(nlabels=10)
+        super().__init__(nlabels=10, one_hot=one_hot)
         datasets, _ = preprocess()
 
         args = [iter(range(10))] * nlabels_per_task

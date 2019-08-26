@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Iterable, List, NamedTuple, Optional, Tuple
 
 import numpy as np
+import tensorflow as tf
 from tensorflow.data import Dataset
 
 Array = np.ndarray
@@ -9,9 +10,21 @@ Array = np.ndarray
 
 class Task(NamedTuple):
     train: Dataset
-    valid: Dataset
+    valid: Optional[Dataset]
     test: Dataset
     labels: Iterable[int]
+
+
+def to_one_hot(task: Task, nlabels: int) -> Task:
+    train, valid, test = (task.train, task.valid, task.test)
+
+    def one_hot(feature: tf.Tensor, label: tf.Tensor):
+        return feature, tf.one_hot(label, nlabels)
+    train = train.map(one_hot)
+    if valid is not None:
+        valid = valid.map(one_hot)
+    test = test.map(one_hot)
+    return Task(train=train, valid=valid, test=test, labels=task.labels)
 
 
 class Model(ABC):
@@ -50,20 +63,19 @@ class TaskSequence:
         training_sets: list of training sets
         test_sets: list of test sets
     """
-    def __init__(self, nlabels: int, tasks: Optional[Iterable[Task]] = None) -> None:
+    def __init__(self, nlabels: int, one_hot: bool = True,
+                 tasks: Optional[Iterable[Task]] = None) -> None:
         self.labels_per_task: List[Iterable[int]] = []
+        self.one_hot = one_hot
         self.nlabels = nlabels
         self.training_sets: List[Dataset] = []
         self.validation_sets: List[Dataset] = []
         self.test_sets: List[Dataset] = []
         self.ntasks = 0
+        self.one_hot = one_hot
         if tasks is not None:
             for task in tasks:
-                self.ntasks += 1
-                self.training_sets.append(task.train)
-                self.validation_sets.append(task.valid)
-                self.test_sets.append(task.test)
-                self.labels_per_task.append(task.labels)
+                self.append(task)
 
     @property
     def feature_dim(self) -> List[int]:
@@ -75,6 +87,8 @@ class TaskSequence:
     def append(self, task: Task) -> None:
         """ Append a training set test set pair to the sequence. """
         self.ntasks += 1
+        if self.one_hot:
+            task = to_one_hot(task, self.nlabels)
         self.training_sets.append(task.train)
         self.validation_sets.append(task.valid)
         self.test_sets.append(task.test)

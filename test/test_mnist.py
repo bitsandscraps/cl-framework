@@ -27,17 +27,23 @@ def check_labels_per_task(list1, list2):
         assert tuple(x) == tuple(y)
 
 
-def check(dataset: _Dataset, labels: Sequence[int]) -> int:
+def check(dataset: _Dataset, labels: Sequence[int], one_hot: bool) -> int:
     """ Test a dataset.
 
     :param dataset: dataset under inspection
     :param labels: labels of interest
+    :param one_hot: whether or not the label is one-hot encoded
     :return: number of samples in the dataset
     """
     x, y = dataset
     assert x.ndim == 2
     assert np.max(x) == 255 / 256
-    assert y.ndim == 1
+    if one_hot:
+        assert y.ndim == 2
+        assert y.shape[-1] == 10
+        y = np.argmax(y, axis=-1)
+    else:
+        assert y.ndim == 1
     assert x.shape[0] == y.shape[0]
     counts = np.histogram(y, range(11))[0]
     for idx in range(10):
@@ -65,17 +71,17 @@ def test_preprocess() -> None:
         assert sample(ds)[0].shape[1] == 784
 
 
-def test_permuted_mnist() -> None:
+def _test_permuted_mnist(one_hot: bool) -> None:
     train_first = valid_first = test_first = None
-    pm = PermutedMnist(10)
+    pm = PermutedMnist(10, one_hot=one_hot)
     check_labels_per_task(pm.labels_per_task, [range(10)] * 10)
     for label, train, valid, test in zip(pm.labels_per_task, pm.training_sets,
                                          pm.validation_sets, pm.test_sets):
         train, valid, test = sample_all(train, valid, test)
         label = tuple(label)
-        check(train, label)
-        check(valid, label)
-        check(test, label)
+        check(train, label, one_hot)
+        check(valid, label, one_hot)
+        check(test, label, one_hot)
 
         if train_first is None:
             train_first, valid_first, test_first = train, valid, test
@@ -89,8 +95,8 @@ def test_permuted_mnist() -> None:
     check_length(pm, 10)
 
 
-def test_split_mnist():
-    sm = SplitMnist(2)
+def _test_split_mnist(one_hot: bool):
+    sm = SplitMnist(2, one_hot=one_hot)
     check_labels_per_task(sm.labels_per_task,
                           [(i, i + 1) for i in range(0, 10, 2)])
     ntrain = nvalid = ntest = 0
@@ -98,14 +104,24 @@ def test_split_mnist():
             sm.labels_per_task, sm.training_sets, sm.validation_sets, sm.test_sets):
         train, valid, test = sample_all(train, valid, test)
         label = tuple(label)
-        ntrain += check(train, label)
-        nvalid += check(valid, label)
-        ntest += check(test, label)
+        ntrain += check(train, label, one_hot)
+        nvalid += check(valid, label, one_hot)
+        ntest += check(test, label, one_hot)
 
     check_length(sm, 5)
     assert ntrain == 50000
     assert nvalid == 10000
     assert ntest == 10000
+
+
+def test_permuted_mnist():
+    _test_permuted_mnist(True)
+    _test_permuted_mnist(False)
+
+
+def test_split_mnist():
+    _test_split_mnist(True)
+    _test_split_mnist(False)
 
 
 if __name__ == '__main__':
