@@ -107,8 +107,8 @@ class TaskSequence:
             of task j after training up to task i - 1.
         """
 
-        accuracy_matrix = np.empty((self.ntasks + 1, self.ntasks))
-        average_accuracy = np.empty((self.ntasks + 1,))
+        accuracy_matrix = np.zeros((self.ntasks + 1, self.ntasks))
+        average_accuracy = np.zeros((self.ntasks + 1,))
         ncorrect = ntotal = 0
         for test_idx, test_set in enumerate(self.test_sets):
             ncorrect_task, ntotal_task = model.evaluate(test_set)
