@@ -6,7 +6,8 @@ import numpy as np
 from tensorflow.python.data import Dataset
 import tensorflow_datasets as tfds
 
-from clfw import Array, Model, Task, TaskSequence
+from clfw import Model, Task, TaskSequence
+from clfw.core import Array
 
 
 TOY_TASK_1_TRAIN = (np.arange(8).reshape(4, 2), np.arange(4))
@@ -50,6 +51,9 @@ class ToyModel(Model):
                 prediction[idx] = self.memory_labels[search[0][0]]
         return int(np.sum(prediction == labels)), ntotal
 
+    def reset(self):
+        self.memory_features = self.memory_labels = None
+
 
 def toy_task_1():
     return Task(train=Dataset.from_tensor_slices(TOY_TASK_1_TRAIN),
@@ -83,14 +87,14 @@ def test_task_sequence():
     assert task_seq.ntasks == 2
     assert task_seq.nlabels == 10
     assert task_seq.feature_dim == [2]
-    acc, accmat = task_seq.evaluate(ToyModel())
+    acc, accmat = task_seq.test(ToyModel())
     assert np.all(acc == np.asarray([0.25, 0.375, 0.5]))
     assert np.all(accmat == np.asarray([[0.5, 0], [0.75, 0], [0.5, 0.5]]))
     with TemporaryDirectory() as dir:
-        acc, accmat = task_seq.evaluate(ToyModel(), logdir=dir)
+        acc, accmat = task_seq.test(ToyModel(), logdir=dir)
         assert np.all(acc == np.asarray([0.25, 0.375, 0.5]))
         assert np.all(accmat == np.asarray([[0.5, 0], [0.75, 0], [0.5, 0.5]]))
-        result = np.load(os.path.join(dir, 'test_acc.npz'))
+        result = np.load(os.path.join(dir, 'test_result.npz'))
         acc, accmat = result['average_accuracy'], result['accuracy_matrix']
         assert np.all(acc == np.asarray([0.25, 0.375, 0.5]))
         assert np.all(accmat == np.asarray([[0.5, 0], [0.75, 0], [0.5, 0.5]]))

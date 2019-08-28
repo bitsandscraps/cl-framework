@@ -49,6 +49,11 @@ class Model(ABC):
         """
         pass
 
+    @abstractmethod
+    def reset(self) -> None:
+        """ Reset the model to its initial state. """
+        pass
+
 
 class TaskSequence:
     """ Sequence of tasks to test a continual learning algorithm.
@@ -92,8 +97,8 @@ class TaskSequence:
         self.test_sets.append(task.test)
         self.labels_per_task.append(task.labels)
 
-    def evaluate(self, model: Model,
-                 logdir: Optional[str] = None) -> Tuple[Array, Array]:
+    def _evaluate(self, model: Model, test: bool = False,
+                  logdir: Optional[str] = None) -> Tuple[Array, Array]:
         """ Evaluate the model using the given sequence of tasks.
 
         Returns:
@@ -106,13 +111,19 @@ class TaskSequence:
             2 is a (N + 1) x N matrix whose (i, j)-th element is the accuracy on test set
             of task j after training up to task i - 1.
         """
-
-        accuracy_matrix = np.zeros((self.ntasks + 1, self.ntasks))
-        average_accuracy = np.zeros((self.ntasks + 1,))
+        if test:
+            evaluation_sets = self.test_sets
+            result_name = 'test_result.npz'
+        else:
+            evaluation_sets = self.validation_sets
+            result_name = 'valid_result.npz'
+        # initialize to -1
+        accuracy_matrix = np.zeros((self.ntasks + 1, self.ntasks)) - 1
+        average_accuracy = np.zeros((self.ntasks + 1,)) - 1
         ncorrect = ntotal = 0
-        for test_idx, test_set in enumerate(self.test_sets):
-            ncorrect_task, ntotal_task = model.evaluate(test_set)
-            accuracy_matrix[0, test_idx] = ncorrect_task / ntotal_task
+        for eval_idx, eval_set in enumerate(evaluation_sets):
+            ncorrect_task, ntotal_task = model.evaluate(eval_set)
+            accuracy_matrix[0, eval_idx] = ncorrect_task / ntotal_task
             ncorrect += ncorrect_task
             ntotal += ntotal_task
         average_accuracy[0] = ncorrect / ntotal
@@ -121,14 +132,24 @@ class TaskSequence:
                     self.validation_sets, self.labels_per_task)):
             model.train(training_set, validation_set, labels)
             ncorrect = ntotal = 0
-            for test_idx, test_set in enumerate(self.test_sets):
-                ncorrect_task, ntotal_task = model.evaluate(test_set)
-                accuracy_matrix[train_idx + 1, test_idx] = ncorrect_task / ntotal_task
+            for eval_idx, eval_set in enumerate(evaluation_sets):
+                ncorrect_task, ntotal_task = model.evaluate(eval_set)
+                accuracy_matrix[train_idx + 1, eval_idx] = ncorrect_task / ntotal_task
                 ncorrect += ncorrect_task
                 ntotal += ntotal_task
             average_accuracy[train_idx + 1] = ncorrect / ntotal
             if logdir is not None:
-                np.savez(os.path.join(logdir, 'test_acc.npz'),
+                np.savez(os.path.join(logdir, result_name),
                          average_accuracy=average_accuracy,
                          accuracy_matrix=accuracy_matrix)
         return average_accuracy, accuracy_matrix
+
+    def validate(self, model: Model,
+                 logdir: Optional[str] = None) -> Tuple[Array, Array]:
+        """ Evaluate the model using validation set. """
+        return self._evaluate(model=model, test=False, logdir=logdir)
+
+    def test(self, model: Model,
+             logdir: Optional[str] = None) -> Tuple[Array, Array]:
+        """ Evaluate the model using test set. """
+        return self._evaluate(model=model, test=True, logdir=logdir)
