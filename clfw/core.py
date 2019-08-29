@@ -27,6 +27,10 @@ def to_one_hot(task: Task, nlabels: int) -> Task:
     return Task(train=train, valid=valid, test=test, labels=task.labels)
 
 
+def evaluate(model: "Model", evaluation_sets: List[Dataset]) -> List[float]:
+    return [model.evaluate(eval_set) for eval_set in evaluation_sets]
+
+
 class Model(ABC):
     """ Base class for a model for continual learning """
     @abstractmethod
@@ -37,17 +41,10 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def evaluate(self, test_set: Dataset) -> Tuple[int, int]:
-        """ Evaluate the model using the given test set.
+    def evaluate(self, test_set: Dataset) -> float:
+        """ Evaluate the model on a test set.
 
-        Returns:
-            1. number of correct predictions
-            2. number of examples in the test set
-
-            For example: 948, 1000
-
-            This means the test set has 1000 examples and the model has achieved 94.8%
-            accuracy on it.
+        :return: Accuracy. Between 0 and 1.
         """
         pass
 
@@ -119,25 +116,20 @@ class TaskSequence:
             evaluation_sets = self.validation_sets
         # initialize to -1
         accuracy_matrix = np.zeros((self.ntasks + 1, self.ntasks)) - 1
-        average_accuracy = np.zeros((self.ntasks + 1,)) - 1
-        ncorrect = ntotal = 0
-        for eval_idx, eval_set in enumerate(evaluation_sets):
-            ncorrect_task, ntotal_task = model.evaluate(eval_set)
-            accuracy_matrix[0, eval_idx] = ncorrect_task / ntotal_task
-            ncorrect += ncorrect_task
-            ntotal += ntotal_task
-        average_accuracy[0] = ncorrect / ntotal
-        for train_idx, (training_set, validation_set, labels) in enumerate(
-                zip(self.training_sets,
-                    self.validation_sets, self.labels_per_task)):
-            model.train(training_set, validation_set, labels)
-            ncorrect = ntotal = 0
-            for eval_idx, eval_set in enumerate(evaluation_sets):
-                ncorrect_task, ntotal_task = model.evaluate(eval_set)
-                accuracy_matrix[train_idx + 1, eval_idx] = ncorrect_task / ntotal_task
-                ncorrect += ncorrect_task
-                ntotal += ntotal_task
-            average_accuracy[train_idx + 1] = ncorrect / ntotal
+        average_accuracy = np.zeros((self.ntasks,)) - 1
+        accuracy_matrix[0, :] = evaluate(model, evaluation_sets)
+        parameters = zip(
+            self.training_sets, self.validation_sets, self.labels_per_task)
+        eval_sets_until_now = None
+        for train_idx, (params, eval_set) in enumerate(zip(parameters,
+                                                           evaluation_sets)):
+            model.train(*params)
+            if train_idx == 0:
+                eval_sets_until_now = eval_set
+            else:
+                eval_sets_until_now = eval_sets_until_now.concatenate(eval_set)
+            accuracy_matrix[train_idx + 1, :] = evaluate(model, evaluation_sets)
+            average_accuracy[train_idx] = model.evaluate(eval_sets_until_now)
             save_results(logdir=logdir, test=test,
                          average_accuracy=average_accuracy,
                          accuracy_matrix=accuracy_matrix)
