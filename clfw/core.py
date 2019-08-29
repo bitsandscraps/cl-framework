@@ -6,6 +6,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.data import Dataset
 
+from clfw.util import save_results
+
 Array = np.ndarray
 
 
@@ -113,10 +115,8 @@ class TaskSequence:
         """
         if test:
             evaluation_sets = self.test_sets
-            result_name = 'test_result.npz'
         else:
             evaluation_sets = self.validation_sets
-            result_name = 'valid_result.npz'
         # initialize to -1
         accuracy_matrix = np.zeros((self.ntasks + 1, self.ntasks)) - 1
         average_accuracy = np.zeros((self.ntasks + 1,)) - 1
@@ -138,8 +138,7 @@ class TaskSequence:
                 ncorrect += ncorrect_task
                 ntotal += ntotal_task
             average_accuracy[train_idx + 1] = ncorrect / ntotal
-            if logdir is not None:
-                np.savez(os.path.join(logdir, result_name),
+            save_results(logdir=logdir, test=test,
                          average_accuracy=average_accuracy,
                          accuracy_matrix=accuracy_matrix)
         return average_accuracy, accuracy_matrix
