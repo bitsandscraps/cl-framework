@@ -14,7 +14,7 @@ from clfw import Task, TaskSequence
 TRAIN_SET_SIZE = 50000
 
 
-def preprocess() -> Tuple[Tuple[Dataset, Dataset, Dataset], int]:
+def preprocess(shuffle: bool) -> Tuple[Tuple[Dataset, Dataset, Dataset], int]:
     """ Preprocess the MNIST dataset.
 
     Load it. Normalize it. Flatten it.
@@ -22,18 +22,21 @@ def preprocess() -> Tuple[Tuple[Dataset, Dataset, Dataset], int]:
     :return: training dataset, validation dataset, test dataset, image_ size
     """
     dataset_info: DatasetInfo
-    datasets, dataset_info = tfds.load(
+    train, dataset_info = tfds.load(
         'mnist:3.*.*', as_supervised=True, with_info=True,
-        split=[f'train[:{TRAIN_SET_SIZE}]', f'train[{TRAIN_SET_SIZE}:]', 'test'],
-        as_dataset_kwargs={'shuffle_files': False})
+        split=f'train[:{TRAIN_SET_SIZE}]', shuffle_files=shuffle)
     image: tfds.features.Image = dataset_info.features['image']
     image_size = reduce(operator.mul, image.shape)
+    datasets = tfds.load('mnist:3.*.*', as_supervised=True,
+                         split=[f'train[{TRAIN_SET_SIZE}:]', 'test'],
+                         shuffle_files=False)
 
     def normalize_and_flatten(image_: tf.Tensor, label: tf.Tensor):
         image_: tf.Tensor = tf.cast(image_, tf.float32) / 256
         return tf.reshape(image_, (image_size,)), label
 
-    train, valid, test = (ds.map(normalize_and_flatten) for ds in datasets)
+    train = train.map(normalize_and_flatten)
+    valid, test = (ds.map(normalize_and_flatten) for ds in datasets)
 
     return (train, valid, test), image_size
 
@@ -44,10 +47,11 @@ class PermutedMnist(TaskSequence):
     For each task, every image in the training and test set of MNIST database is
     permuted in a certain random order.
     """
-    def __init__(self, ntasks: int = 5, one_hot: bool = True) -> None:
+    def __init__(self, ntasks: int = 5, shuffle: bool = True,
+                 one_hot: bool = True) -> None:
         """ Inits a PermutedMnist class with `ntasks` tasks """
         super().__init__(nlabels=10, one_hot=one_hot)
-        datasets, image_size = preprocess()
+        datasets, image_size = preprocess(shuffle)
 
         for _ in range(ntasks):
             pattern = np.random.permutation(image_size)
@@ -66,14 +70,15 @@ class SplitMnist(TaskSequence):
     Each task has its own labels of interest. The training set and test set of a task
     contains only the images with the corresponding labels.
     """
-    def __init__(self, nlabels_per_task: int = 2, one_hot: bool = True) -> None:
+    def __init__(self, nlabels_per_task: int = 2, shuffle: bool = True,
+                 one_hot: bool = True) -> None:
         """ Inits a SplitMnist class.
 
         Args:
             nlabels_per_task: number of labels assigned to each task.
         """
         super().__init__(nlabels=10, one_hot=one_hot)
-        datasets, _ = preprocess()
+        datasets, _ = preprocess(shuffle)
 
         args = [iter(range(10))] * nlabels_per_task
         labels_of_interest_for_each_task = zip_longest(*args)

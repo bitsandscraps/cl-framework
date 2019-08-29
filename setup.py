@@ -2,12 +2,12 @@ from setuptools import setup
 
 setup(
     name='clfw',
-    version='0.13',
+    version='0.14',
     packages=['clfw'],
     url='https://github.com/bitsandscraps/continual-learning-framework',
     license='MIT',
     author='bitsandscraps',
     author_email='daniel9607@hanmail.net',
     description='A framework for training and testing continual learning algorithms.',
-    install_requires=['tensorflow', 'tensorflow-datasets']
+    install_requires=['tensorflow', 'tensorflow-datasets==1.2.0']
 )

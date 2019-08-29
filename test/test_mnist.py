@@ -61,7 +61,15 @@ def check_length(model: TaskSequence, length: int) -> None:
 
 
 def test_preprocess() -> None:
-    datasets, image_size = preprocess()
+    datasets, image_size = preprocess(shuffle=False)
+    assert image_size == 784
+
+    def sample(ds) -> Tuple[tf.Tensor, tf.Tensor]:
+        return next(iter(ds.cache().batch(1)))
+
+    for ds in datasets:
+        assert sample(ds)[0].shape[1] == 784
+    datasets, image_size = preprocess(shuffle=True)
     assert image_size == 784
 
     def sample(ds) -> Tuple[tf.Tensor, tf.Tensor]:
@@ -73,7 +81,7 @@ def test_preprocess() -> None:
 
 def _test_permuted_mnist(one_hot: bool) -> None:
     train_first = valid_first = test_first = None
-    pm = PermutedMnist(10, one_hot=one_hot)
+    pm = PermutedMnist(10, one_hot=one_hot, shuffle=False)
     check_labels_per_task(pm.labels_per_task, [range(10)] * 10)
     for label, train, valid, test in zip(pm.labels_per_task, pm.training_sets,
                                          pm.validation_sets, pm.test_sets):
@@ -96,7 +104,7 @@ def _test_permuted_mnist(one_hot: bool) -> None:
 
 
 def _test_split_mnist(one_hot: bool):
-    sm = SplitMnist(2, one_hot=one_hot)
+    sm = SplitMnist(2, one_hot=one_hot, shuffle=False)
     check_labels_per_task(sm.labels_per_task,
                           [(i, i + 1) for i in range(0, 10, 2)])
     ntrain = nvalid = ntest = 0
